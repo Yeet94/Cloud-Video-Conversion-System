@@ -1,0 +1,107 @@
+[
+    {
+        "Name": "cloudvideoconversionsystem_video-network",
+        "Id": "ab156a925baa1ae91992416dd7711b4db8ebcccf8b7d89d9c384e2cad5a361d8",
+        "Created": "2025-12-24T12:38:11.79698383Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "IPRange": "",
+                    "Gateway": "172.18.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {
+            "com.docker.network.enable_ipv4": "true",
+            "com.docker.network.enable_ipv6": "false"
+        },
+        "Labels": {
+            "com.docker.compose.config-hash": "d67f03d6d9cbcd57984d83f3a7c8018637121753bf962e75b00f09d11fe0aa40",
+            "com.docker.compose.network": "video-network",
+            "com.docker.compose.project": "cloudvideoconversionsystem",
+            "com.docker.compose.version": "2.40.3"
+        },
+        "Containers": {
+            "1e3cddf394a0019cdac7cae4c06b2d1594343207f44f09f4ec723fb26e08d6c8": {
+                "Name": "prometheus",
+                "EndpointID": "2954c84774b220d1b126bf3b62f9540b655a5728e11d5842c65f209e6556fe5b",
+                "MacAddress": "f6:3b:d5:b3:40:56",
+                "IPv4Address": "172.18.0.5/16",
+                "IPv6Address": ""
+            },
+            "385fb9d003b2f5559bd9a6276160d499f11700fea5495bc2208f134eeabc88d6": {
+                "Name": "cloudvideoconversionsystem-worker-2",
+                "EndpointID": "73382e7d3c9b6846173fd7eef22d880e041f8814f100d9ded31f61dae5203b03",
+                "MacAddress": "92:04:ee:ad:8b:20",
+                "IPv4Address": "172.18.0.8/16",
+                "IPv6Address": ""
+            },
+            "5803767ea748f8293689aa47ef5c6ffedd369637f8e681032ee2aa8ab8fb2844": {
+                "Name": "api",
+                "EndpointID": "563e05bf3b82329643670e83cf4514f2f058a1db1fa5fa23b3e1dbf3388a9068",
+                "MacAddress": "ea:46:bd:ff:b5:a6",
+                "IPv4Address": "172.18.0.4/16",
+                "IPv6Address": ""
+            },
+            "6e4ac4aa16c772342b7262c0d1175963643c38fb0483afad50db1d4ad65d2bb4": {
+                "Name": "cloudvideoconversionsystem-worker-1",
+                "EndpointID": "662f311ed374fa92ec27243667616b5faddd0c634326c66761c8ea373325cb3c",
+                "MacAddress": "e2:e3:f7:6d:52:39",
+                "IPv4Address": "172.18.0.9/16",
+                "IPv6Address": ""
+            },
+            "9bf797b723b83476059c8884bc0ad9844de695ee44cf166f5259fb10161a9d5e": {
+                "Name": "grafana",
+                "EndpointID": "11c58598a9916c1d45436f3d59994c0b72a47a9b8477bd97dfdf923fb23d264b",
+                "MacAddress": "9e:d2:28:0e:ed:b8",
+                "IPv4Address": "172.18.0.6/16",
+                "IPv6Address": ""
+            },
+            "a43505e449b92320969be54c4322aa3da9f6798316e662add6ec11b047db0746": {
+                "Name": "rabbitmq",
+                "EndpointID": "0f5403e428444ad4704a57dc9727c3fb46e03ed4c170c87e489da0a15c398e83",
+                "MacAddress": "92:33:9b:ca:56:9d",
+                "IPv4Address": "172.18.0.3/16",
+                "IPv6Address": ""
+            },
+            "c462da97a4c9fbeda39c9a2fa5d75c597885f230c3f6b3904c09ac85c6a86d65": {
+                "Name": "frontend",
+                "EndpointID": "6e262991050cd9f9c9bdeaf5a5dbab8c66f4e554eba15d8b25f5881016a8f45a",
+                "MacAddress": "6a:eb:2c:c5:aa:4b",
+                "IPv4Address": "172.18.0.7/16",
+                "IPv6Address": ""
+            },
+            "f5fe2c72efd39f2acb0f3922cee7299bea825132c84da4bd79277b6b9d5b78cb": {
+                "Name": "minio",
+                "EndpointID": "9c54d69f4273dd865bee18268d381c4861584ff3494753752b1f117f806d7599",
+                "MacAddress": "f2:dc:60:e4:39:b1",
+                "IPv4Address": "172.18.0.2/16",
+                "IPv6Address": ""
+            }
+        },
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.18.0.0/16": {
+                        "IPsInUse": 11,
+                        "DynamicIPsAvailable": 65525
+                    }
+                }
+            }
+        }
+    }
+]
