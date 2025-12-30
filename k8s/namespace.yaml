@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: video-processing
+  labels:
+    name: video-processing
+    app: cloud-video-conversion

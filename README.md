@@ -3,9 +3,9 @@
 A distributed, event-driven microservices application for scalable video processing using FastAPI, RabbitMQ, MinIO, FFmpeg, and KEDA autoscaling on Kubernetes.
 
 > [!TIP]
-> **New to the project?** Check out the [In-Depth Architecture & Workflow Guide](docs/ARCHITECTURE_AND_WORKFLOW.md) for a deep dive into how components interact.
+> **New to the project?** Check out the [Architecture Guide](docs/ARCHITECTURE.md) for a deep dive into how components interact.
 
-## 🏗️ Architecture
+## 🏗️ System Overview
 
 ```mermaid
 graph TD
@@ -18,7 +18,7 @@ graph TD
     
     subgraph "Messaging & State"
         RabbitMQ[(RabbitMQ Queue)]
-        SQLite[(SQLite DB)]
+        Database[(Database)]
     end
     
     subgraph "Storage Layer"
@@ -41,7 +41,7 @@ graph TD
     User -->|4. Upload Video| MinIO
     
     API -->|5. Enqueue Job| RabbitMQ
-    API -->|6. Persist Job State| SQLite
+    API -->|6. Persist Job State| Database
     
     KEDA -->|Monitor Queue Depth| RabbitMQ
     KEDA -->|Scale Replicas| Worker
@@ -50,115 +50,88 @@ graph TD
     Worker -->|8. Download Video| MinIO
     Worker -->|9. Convert with FFmpeg| Worker
     Worker -->|10. Upload Output| MinIO
-    Worker -->|11. Update Status| SQLite
+    Worker -->|11. Update Status| Database
     
     Prometheus -->|Scrape Metrics| API
     Prometheus -->|Scrape Metrics| Worker
     Grafana -->|Query| Prometheus
 ```
 
-## 📋 Prerequisites
+### Key Features
 
-- **Docker Desktop** with Kubernetes enabled
-- **kubectl** CLI tool
-- **Helm** 3.x (for KEDA and Prometheus)
-- **Git** (to clone this repository)
+- **Event-Driven Architecture**: Asynchronous processing via RabbitMQ
+- **Auto-Scaling**: KEDA scales workers (1-10 pods) based on queue depth
+- **Fault Tolerance**: Job recovery and automatic retries
+- **Monitoring**: Pre-configured Grafana dashboards with Prometheus metrics
+- **Cloud-Native**: Designed for Kubernetes with production-ready patterns
 
-### Enable Kubernetes in Docker Desktop
+---
 
-1. Open Docker Desktop Settings
-2. Go to **Kubernetes** tab
-3. Check **Enable Kubernetes**
-4. Click **Apply & Restart**
-5. Wait for Kubernetes to start (green icon in status bar)
-
-## 🚀 Quick Start
+## 🚀 Choose Your Deployment Method
 
 ### Option 1: Docker Compose (Local Development)
 
-```bash
-# Clone the repository
-cd "Cloud Video Conversion System"
+**Best for**: Local development, quick testing, and learning the system
 
-# Start all services
+```bash
 docker-compose up -d
-
-# Check service status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
 ```
 
-**Access Points:**
-| Service | URL |
-|---------|-----|
-| API | http://localhost:8000 |
-| API Docs | http://localhost:8000/docs |
-| RabbitMQ Management | http://localhost:15672 (guest/guest) |
-| MinIO Console | http://localhost:9001 (minioadmin/minioadmin) |
-| Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3000 (admin/admin) |
+📖 **[Full Docker Compose Guide →](docs/local/DOCKER_COMPOSE.md)**
 
-> [!NOTE]
-> To test **Scalability Metrics** in Grafana, you can scale the worker service manually:
-> ```bash
-> docker-compose up -d --scale worker=3
-> ```
-> Prometheus will automatically discover the new worker instances.
+**Quick Access:**
+- Frontend: http://localhost
+- API: http://localhost:8000
+- Grafana: http://localhost:3000 (admin/admin)
+- RabbitMQ: http://localhost:15672 (guest/guest)
+- MinIO: http://localhost:9001 (minioadmin/minioadmin)
 
-### Option 2: Kubernetes Deployment
+---
 
-```bash
-# Build Docker images
-docker build -t video-api:latest -f api/Dockerfile .
-docker build -t video-worker:latest -f worker/Dockerfile .
+### Option 2: Kubernetes on Minikube
 
-# Create namespace and apply manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/database-pvc.yaml
-kubectl apply -f k8s/rabbitmq.yaml
-kubectl apply -f k8s/minio.yaml
-kubectl apply -f k8s/api-deployment.yaml
-kubectl apply -f k8s/worker-deployment.yaml
+**Best for**: Kubernetes learning, demonstrating autoscaling (HPA/KEDA), and fault tolerance
 
-# Install KEDA
-helm repo add kedacore https://kedacore.github.io/charts
-helm repo update
-helm install keda kedacore/keda -n keda --create-namespace
-
-# Apply KEDA scaling
-kubectl apply -f k8s/keda-scaledobject.yaml
-
-# Install Prometheus Operator
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n monitoring --create-namespace
-
-# Check deployment status
-kubectl get pods -n video-processing
+```powershell
+# Automated deployment
+.\scripts\deploy-minikube.ps1
 ```
 
-## 📚 API Reference
+📖 **[Full Minikube Guide →](docs/kubernetes/MINIKUBE.md)**
 
-### Upload Video
+**Features Demonstrated:**
+- KEDA autoscaling (1-10 workers)
+- Prometheus + Grafana monitoring
+- Fault tolerance and job recovery
+- Horizontal Pod Autoscaling (HPA)
+
+---
+
+## 📚 Documentation
+
+### Getting Started
+
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - Component interactions and data flow
+- **[Docker Compose Setup](docs/local/DOCKER_COMPOSE.md)** - Local development guide
+- **[Minikube Deployment](docs/kubernetes/MINIKUBE.md)** - Kubernetes testing guide
+
+### Testing & Operations
+
+- **[Performance Testing](docs/PERFORMANCE_TESTING.md)** - Load testing and benchmarks
+- **[Troubleshooting (Docker Compose)](docs/local/TROUBLESHOOTING.md)** - Common Docker issues
+- **[Troubleshooting (Kubernetes)](docs/kubernetes/TROUBLESHOOTING.md)** - Common K8s issues
+
+---
+
+## 📋 API Reference
+
+### Upload and Convert a Video
 
 **Step 1: Request upload URL**
 ```bash
 curl -X POST http://localhost:8000/upload/request \
   -H "Content-Type: application/json" \
   -d '{"filename": "my_video.avi", "content_type": "video/avi"}'
-```
-
-Response:
-```json
-{
-  "upload_url": "http://minio:9000/videos/uploads/abc123.avi?...",
-  "object_path": "uploads/abc123.avi",
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "expires_in": 3600
-}
 ```
 
 **Step 2: Upload file to presigned URL**
@@ -168,8 +141,7 @@ curl -X PUT "UPLOAD_URL_FROM_STEP_1" \
   --data-binary @my_video.avi
 ```
 
-### Create Conversion Job
-
+**Step 3: Create conversion job**
 ```bash
 curl -X POST http://localhost:8000/jobs \
   -H "Content-Type: application/json" \
@@ -179,36 +151,44 @@ curl -X POST http://localhost:8000/jobs \
   }'
 ```
 
-### Check Job Status
-
+**Step 4: Check job status**
 ```bash
 curl http://localhost:8000/jobs/{job_id}
 ```
 
-### List All Jobs
-
+**Step 5: Download converted video**
 ```bash
-curl "http://localhost:8000/jobs?status=completed&limit=50"
+curl http://localhost:8000/download/{job_id} -o output.mp4
 ```
 
-### Download Converted Video
+### Additional Endpoints
 
-```bash
-curl http://localhost:8000/download/{job_id}
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/docs` | GET | Interactive API documentation (Swagger) |
+| `/upload/request` | POST | Request presigned upload URL |
+| `/jobs` | POST | Create conversion job |
+| `/jobs` | GET | List all jobs (supports filtering) |
+| `/jobs/{job_id}` | GET | Get job status |
+| `/download/{job_id}` | GET | Get download URL for converted video |
+| `/metrics` | GET | Prometheus metrics |
+
+---
 
 ## 📊 Monitoring
 
 ### Grafana Dashboards
 
-The system includes a pre-configured Grafana dashboard with these panels:
+Pre-configured dashboards show:
 
 1. **Throughput** - Videos processed per minute
-2. **Scalability** - Queue depth vs worker pods (dual axis)
+2. **Scalability** - Queue depth vs worker pods
 3. **Error Rates** - Errors per minute by type
 4. **Conversion Performance** - P50/P95/P99 latencies
+5. **Resource Usage** - CPU/Memory per component
 
-### Prometheus Metrics
+### Key Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
@@ -220,113 +200,88 @@ The system includes a pre-configured Grafana dashboard with these panels:
 | `worker_failure_rate_total` | Counter | Failures by type |
 | `worker_active_jobs` | Gauge | Currently processing jobs |
 
+---
+
 ## 🧪 Load Testing
 
 ### Using Locust
 
+**Docker Compose:**
 ```bash
-# Start main services first
-docker-compose up -d
-
-# Start Locust
 docker-compose -f docker-compose.locust.yml up -d
-
-# Open Locust UI
-# http://localhost:8089
+# Visit http://localhost:8089
 ```
 
-**Recommended test settings:**
-- **Number of users:** 50
-- **Spawn rate:** 5 users/second
-- **Host:** http://api:8000
+**Kubernetes:**
+```bash
+kubectl port-forward svc/locust-master 8089:8089 -n video-processing
+# Visit http://localhost:8089
+```
 
-### Test Scenarios
+**Test Configuration:**
+- Users: 50
+- Spawn rate: 5 users/second
+- Host: http://api:8000
 
-1. **VideoProcessingUser** - Simulates normal user behavior
-   - Request upload URL
-   - Create conversion jobs
-   - Poll job status
-   - Download completed videos
-
-2. **BurstUser** - Simulates spike traffic
-   - Rapid job creation
-   - Tests autoscaling behavior
-
-## 🔥 Fault Tolerance Demos
-
-### Demo 1: Kill Worker Pod
-
-Demonstrates job recovery when a worker pod fails mid-processing.
+### Using Load Generator Script
 
 ```bash
-# Make script executable (Git Bash on Windows)
-chmod +x scripts/fault-tolerance/kill-worker.sh
-
-# Run demo
-./scripts/fault-tolerance/kill-worker.sh
+python scripts/load-generator.py --api-url http://localhost:8000 --jobs 100 --video-size 10
 ```
 
-**Expected behavior:**
-1. Worker pod is terminated
-2. Job message is re-queued in RabbitMQ
-3. Another worker picks up the job
-4. Job completes successfully
+---
 
-### Demo 2: Kill FFmpeg Process
+## 📁 Project Structure
 
-Demonstrates recovery when FFmpeg crashes inside a worker.
-
-```bash
-./scripts/fault-tolerance/kill-ffmpeg.sh
+```
+Cloud Video Conversion System/
+├── api/                        # FastAPI application
+│   ├── main.py                 # API endpoints
+│   ├── requirements.txt
+│   └── Dockerfile
+├── worker/                     # Video processing worker
+│   ├── worker.py               # Worker logic
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/                   # Web UI
+│   ├── index.html
+│   ├── app.js
+│   └── Dockerfile
+├── shared/                     # Shared utilities
+│   ├── config.py               # Configuration
+│   ├── models.py               # Data models
+│   └── database.py             # Database operations
+├── k8s/                        # Kubernetes manifests
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── api-deployment.yaml
+│   ├── worker-deployment.yaml
+│   ├── keda-scaledobject.yaml
+│   └── monitoring/
+├── monitoring/                 # Monitoring configuration
+│   ├── prometheus.yml
+│   └── grafana/
+│       └── dashboards/
+├── scripts/                    # Deployment and testing scripts
+│   ├── deploy-minikube.ps1
+│   ├── load-generator.py
+│   └── fault-tolerance-test.py
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── PERFORMANCE_TESTING.md
+│   ├── local/                  # Docker Compose docs
+│   │   ├── DOCKER_COMPOSE.md
+│   │   └── TROUBLESHOOTING.md
+│   └── kubernetes/             # Kubernetes docs
+│       ├── MINIKUBE.md
+│       ├── PRODUCTION.md
+│       └── TROUBLESHOOTING.md
+├── docker-compose.yaml         # Local development
+├── docker-compose.locust.yml   # Load testing
+└── README.md                   # This file
 ```
 
-**Expected behavior:**
-1. FFmpeg process is killed
-2. Worker detects failure
-3. Message is NACKed and re-queued
-4. Job is retried by a worker
-
-### Demo 3: Kill MinIO Pod
-
-Demonstrates StatefulSet recovery for persistent storage.
-
-```bash
-./scripts/fault-tolerance/kill-minio.sh
-```
-
-**Expected behavior:**
-1. MinIO pod is terminated
-2. StatefulSet recreates the pod
-3. PVC is re-attached
-4. All data is preserved
-
-### Demo 4: Inject Network Latency
-
-Demonstrates system resilience under degraded network conditions.
-
-```bash
-./scripts/fault-tolerance/inject-latency.sh
-```
-
-**Expected behavior:**
-1. Network latency is added to worker pod
-2. Job processing slows down but continues
-3. Grafana shows increased P95/P99 conversion times
-4. No job failures or message loss
-
-### Demo 5: Inject CPU Pressure
-
-Demonstrates system behavior under resource contention.
-
-```bash
-./scripts/fault-tolerance/inject-cpu-pressure.sh
-```
-
-**Expected behavior:**
-1. Worker experiences high CPU usage
-2. FFmpeg conversion slows significantly
-3. KEDA may trigger additional worker scaling
-4. Jobs eventually complete successfully
+---
 
 ## ⚙️ Configuration
 
@@ -355,99 +310,31 @@ Demonstrates system behavior under resource contention.
 | `FFMPEG_PRESET` | medium | Encoding speed/quality |
 | `FFMPEG_CRF` | 23 | Quality (0-51, lower=better) |
 
+---
+
 ## 🔧 Troubleshooting
+
+### Quick Diagnostics
+
+**Docker Compose:**
+```bash
+docker-compose logs -f
+docker-compose ps
+```
+
+**Kubernetes:**
+```bash
+kubectl get pods -n video-processing
+kubectl logs -f -l app=worker -n video-processing
+kubectl get events -n video-processing --sort-by='.lastTimestamp'
+```
 
 ### Common Issues
 
-**1. Pods stuck in Pending state**
-```bash
-kubectl describe pod <pod-name> -n video-processing
-```
-Usually due to insufficient resources or missing PVCs.
+- **[Docker Compose Troubleshooting →](docs/local/TROUBLESHOOTING.md)**
+- **[Kubernetes Troubleshooting →](docs/kubernetes/TROUBLESHOOTING.md)**
 
-**2. Worker not connecting to RabbitMQ**
-```bash
-kubectl logs -l app=worker -n video-processing
-```
-Check RabbitMQ is ready and credentials are correct.
-
-**3. MinIO bucket not created**
-```bash
-kubectl logs job/minio-init -n video-processing
-```
-Ensure MinIO pod is healthy before init job runs.
-
-**4. KEDA not scaling**
-```bash
-kubectl get scaledobject -n video-processing
-kubectl describe scaledobject worker-scaledobject -n video-processing
-```
-Check KEDA is installed and RabbitMQ connection is valid.
-
-### Useful Commands
-
-```bash
-# View all resources
-kubectl get all -n video-processing
-
-# Check KEDA scaling
-kubectl get hpa -n video-processing
-
-# View worker logs
-kubectl logs -f -l app=worker -n video-processing
-
-# Port forward services
-kubectl port-forward svc/api 8000:8000 -n video-processing
-kubectl port-forward svc/rabbitmq 15672:15672 -n video-processing
-kubectl port-forward svc/minio 9001:9001 -n video-processing
-
-# Scale workers manually
-kubectl scale deployment worker --replicas=5 -n video-processing
-```
-
-## 📁 Project Structure
-
-```
-Cloud Video Conversion System/
-├── api/
-│   ├── main.py              # FastAPI application
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile
-├── worker/
-│   ├── worker.py            # Video processing worker
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile
-├── shared/
-│   ├── __init__.py
-│   ├── config.py            # Shared configuration
-│   ├── models.py            # Pydantic models
-│   └── database.py          # SQLite operations
-├── k8s/
-│   ├── namespace.yaml
-│   ├── configmap.yaml
-│   ├── database-pvc.yaml
-│   ├── rabbitmq.yaml
-│   ├── minio.yaml
-│   ├── api-deployment.yaml
-│   ├── worker-deployment.yaml
-│   └── keda-scaledobject.yaml
-├── monitoring/
-│   ├── prometheus.yml
-│   └── grafana/
-│       ├── provisioning/
-│       └── dashboards/
-├── scripts/
-│   └── fault-tolerance/
-│       ├── kill-worker.sh
-│       ├── kill-ffmpeg.sh
-│       └── kill-minio.sh
-├── tests/
-│   └── load/
-│       └── locustfile.py
-├── docker-compose.yml
-├── docker-compose.locust.yml
-└── README.md
-```
+---
 
 ## 📄 License
 
@@ -459,3 +346,7 @@ This project is for educational and demonstration purposes.
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
+
+---
+
+**Built with** ❤️ **for demonstrating cloud-native best practices**

@@ -1,0 +1,126 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: video-processing
+  labels:
+    app: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: worker
+        image: video-worker:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+          name: metrics
+        env:
+        - name: APP_RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_HOST
+        - name: APP_RABBITMQ_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_PORT
+        - name: APP_RABBITMQ_USER
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_USER
+        - name: APP_RABBITMQ_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_PASSWORD
+        - name: APP_RABBITMQ_QUEUE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_QUEUE
+        - name: APP_RABBITMQ_VHOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: RABBITMQ_VHOST
+        - name: APP_MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_ENDPOINT
+        - name: APP_MINIO_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_ACCESS_KEY
+        - name: APP_MINIO_SECRET_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_SECRET_KEY
+        - name: APP_MINIO_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_BUCKET
+        - name: APP_MINIO_SECURE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MINIO_SECURE
+        - name: APP_DATABASE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DATABASE_PATH
+        volumeMounts:
+        - name: database
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+      volumes:
+      - name: database
+        persistentVolumeClaim:
+          claimName: database-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: video-processing
+  labels:
+    app: worker
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: metrics
+  selector:
+    app: worker

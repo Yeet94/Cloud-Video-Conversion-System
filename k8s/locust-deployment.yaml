@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master
+  namespace: video-processing
+  labels:
+    app: locust
+    role: master
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8089
+      targetPort: 8089
+      protocol: TCP
+      name: web
+    - port: 5557
+      targetPort: 5557
+      protocol: TCP
+      name: master
+  selector:
+    app: locust
+    role: master
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master
+  namespace: video-processing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust
+      role: master
+  template:
+    metadata:
+      labels:
+        app: locust
+        role: master
+    spec:
+      containers:
+      - name: locust
+        image: locust-load:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8089
+          name: web
+        - containerPort: 5557
+          name: master
+        env:
+        - name: LOCUST_MODE
+          value: "master"
+        - name: LOCUST_LOCUSTFILE
+          value: "/locust/locustfile.py"
+        - name: LOCUST_HOST
+          value: "http://api:8000"
+        command:
+        - locust
+        - -f
+        - /locust/locustfile.py
+        - --master
+        - --expect-workers=2
+        - --host=http://api:8000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker
+  namespace: video-processing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: locust
+      role: worker
+  template:
+    metadata:
+      labels:
+        app: locust
+        role: worker
+    spec:
+      containers:
+      - name: locust
+        image: locust-load:latest
+        imagePullPolicy: Never
+        env:
+        - name: LOCUST_MODE
+          value: "worker"
+        - name: LOCUST_MASTER_NODE_HOST
+          value: "locust-master"
+        - name: LOCUST_LOCUSTFILE
+          value: "/locust/locustfile.py"
+        command:
+        - locust
+        - -f
+        - /locust/locustfile.py
+        - --worker
+        - --master-host=locust-master
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"

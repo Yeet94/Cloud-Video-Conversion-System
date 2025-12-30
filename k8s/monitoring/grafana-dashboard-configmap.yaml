@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-config
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  video-processing.json: |-
+{{DASHBOARD_JSON}}

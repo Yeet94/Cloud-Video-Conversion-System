@@ -2,75 +2,172 @@
 description: Deploy the Video Conversion System to Minikube
 ---
 
-## 1. Start Minikube
-First, ensure Minikube is running.
-```bash
-minikube start --driver=docker
-```
+# Deploy to Minikube
 
-## 2. Connect to Minikube's Docker Daemon
-This step is critical. It points your local docker client to Minikube's internal Docker engine. This allows us to build images directly inside Minikube so Kubernetes can see them (since we use `imagePullPolicy: Never`).
+This workflow deploys the Cloud Video Conversion System to a fresh Minikube cluster with monitoring and autoscaling.
 
-**PowerShell:**
+## Prerequisites
+
+Ensure you have the following installed:
+- Docker Desktop (running)
+- Minikube
+- kubectl
+- Helm
+- Python 3.x (for testing scripts)
+
+## Deployment Steps
+
+// turbo-all
+
+### 1. Run the Deployment Script
+
+**PowerShell (Windows)**:
 ```powershell
-& minikube -p minikube docker-env --shell powershell | Invoke-Expression
+.\scripts\deploy-minikube.ps1
 ```
 
-**Bash:**
-```bash
-eval $(minikube docker-env)
-```
+This script will:
+- Delete any existing Minikube cluster (clean slate)
+- Start a fresh Minikube instance (4 CPUs, 8GB RAM)
+- Connect to Minikube's Docker daemon
+- Build all Docker images inside Minikube
+- Install KEDA for autoscaling
+- Install Prometheus + Grafana for monitoring
+- Deploy all services to the `video-processing` namespace
+- Configure autoscaling (1-10 workers, 5 messages/pod threshold)
 
-## 3. Build Images (Inside Minikube)
-Build the images. Since we are connected to Minikube, these images will be stored there.
+### 2. Verify Deployment
 
-```bash
-docker build -t video-api:latest -f api/Dockerfile .
-docker build -t video-worker:latest -f worker/Dockerfile .
-docker build -t video-frontend:latest -f frontend/Dockerfile.k8s frontend/
-```
-
-## 4. Deploy to Kubernetes
-Apply the manifests in the correct order.
-
-```bash
-# 1. Create Namespace
-kubectl apply -f k8s/namespace.yaml
-
-# 2. Configs and Secrets
-kubectl apply -f k8s/configmap.yaml
-
-# 3. Third-party Services (RabbitMQ, MinIO)
-kubectl apply -f k8s/rabbitmq.yaml
-kubectl apply -f k8s/minio.yaml
-kubectl apply -f k8s/database-pvc.yaml
-
-# 4. Application Services
-kubectl apply -f k8s/api-deployment.yaml
-kubectl apply -f k8s/worker-deployment.yaml
-kubectl apply -f k8s/frontend-deployment.yaml
-```
-
-## 5. Verify Deployment
-Check if pods are starting.
-
+Check that all pods are running:
 ```bash
 kubectl get pods -n video-processing
 ```
 
-## 6. Access the Application
-Since we are using Minikube, we usually use `minikube tunnel` or `minikube service` to expose LoadBalancers.
+Expected pods:
+- `api-*` (2 replicas)
+- `worker-*` (1+ replicas, scaled by KEDA)
+- `rabbitmq-*` (1 replica)
+- `minio-*` (1 replica)
+- `frontend-*` (1 replica)
 
-**Option A (Recommended): Minikube Tunnel**
-Run this in a **separate terminal** and keep it running:
-```bash
-minikube tunnel
-```
-This will assign External IPs to your services.
-Then you can access the frontend at `http://localhost` (or the IP assigned).
+### 3. Access the Application
 
-**Option B: Direct Service URL**
-Get the direct URL for the frontend:
+**Frontend UI** (recommended):
 ```bash
 minikube service frontend -n video-processing
 ```
+This will automatically open your browser.
+
+**API Documentation**:
+```bash
+minikube service api -n video-processing
+```
+Then navigate to `/docs` for Swagger UI.
+
+### 4. Access Monitoring
+
+**Grafana Dashboard**:
+```bash
+kubectl port-forward svc/prometheus-grafana 3000:80 -n monitoring
+```
+Open http://localhost:3000 (admin/admin)
+
+**RabbitMQ Management**:
+```bash
+kubectl port-forward svc/rabbitmq 15672:15672 -n video-processing
+```
+Open http://localhost:15672 (guest/guest)
+
+**MinIO Console**:
+```bash
+kubectl port-forward svc/minio 9001:9001 -n video-processing
+```
+Open http://localhost:9001 (minioadmin/minioadmin)
+
+## Load Testing
+
+### Run Performance Baseline Test
+
+First, port-forward the API:
+```bash
+kubectl port-forward svc/api 8000:8000 -n video-processing
+```
+
+Then run load tests with different video sizes:
+```bash
+# 10MB videos (fast conversion)
+python scripts/load-generator.py --api-url http://localhost:8000 --jobs 50 --video-size 10 --monitor
+
+# 50MB videos
+python scripts/load-generator.py --api-url http://localhost:8000 --jobs 30 --video-size 50
+
+# 100MB videos (slower, triggers more scaling)
+python scripts/load-generator.py --api-url http://localhost:8000 --jobs 20 --video-size 100
+```
+
+Watch the autoscaler in action:
+```bash
+kubectl get hpa -n video-processing -w
+kubectl get pods -n video-processing -l app=worker -w
+```
+
+## Fault Tolerance Testing
+
+Run fault tolerance tests to verify system resilience:
+
+```bash
+# Test pod termination (job requeuing)
+python scripts/fault-tolerance-test.py pod-kill
+
+# Test network latency (degraded performance)  
+python scripts/fault-tolerance-test.py network-latency
+
+# Test CPU pressure (resource contention)
+python scripts/fault-tolerance-test.py cpu-pressure
+
+# Run all tests
+python scripts/fault-tolerance-test.py all
+```
+
+Monitor the results in Grafana to see how the system handles faults.
+
+## Results Documentation
+
+Document your test results in:
+```
+docs/PERFORMANCE_TESTING_RESULTS.md
+```
+
+This template includes tables for:
+- Baseline performance by video size
+- Scalability behavior (queue depth vs workers)
+- Fault tolerance results
+- Resource utilization metrics
+
+## Troubleshooting
+
+**Pods not starting**:
+```bash
+kubectl describe pod <pod-name> -n video-processing
+kubectl logs <pod-name> -n video-processing
+```
+
+**Check KEDA ScaledObject**:
+```bash
+kubectl get scaledobject -n video-processing
+kubectl describe scaledobject worker-scaledobject -n video-processing
+```
+
+**MinIO not accessible**:
+```bash
+kubectl logs -l app=minio -n video-processing
+kubectl logs -l job-name=minio-init -n video-processing
+```
+
+## Clean Up
+
+To remove everything:
+```bash
+minikube delete
+```
+

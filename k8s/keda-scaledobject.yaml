@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaledobject
+  namespace: video-processing
+spec:
+  scaleTargetRef:
+    name: worker
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 10
+  cooldownPeriod: 30
+  triggers:
+  - type: rabbitmq
+    metadata:
+      protocol: auto
+      queueName: video-jobs
+      mode: QueueLength
+      value: "5"
+      host: amqp://guest:guest@rabbitmq.video-processing.svc.cluster.local:5672/
