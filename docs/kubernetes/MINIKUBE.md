@@ -5,10 +5,10 @@ This guide provides comprehensive instructions for deploying the Cloud Video Con
 ## Overview
 
 This deployment demonstrates:
-- **Event-driven autoscaling** with KEDA (1-10 workers based on queue depth)
-- **Horizontal Pod Autoscaling** (HPA) in action
+- **Dual-trigger autoscaling** with KEDA (queue depth) + HPA (CPU/Memory)
+- **Smart load balancing** with health-aware readiness probes
 - **Monitoring and observability** with Prometheus + Grafana
-- **Fault tolerance** and job recovery
+- **Fault tolerance** and automatic worker isolation
 - **Production-like architecture** on your local machine
 
 ## Prerequisites
@@ -202,8 +202,9 @@ kubectl apply -f k8s/api-deployment.yaml
 kubectl apply -f k8s/worker-deployment.yaml
 kubectl apply -f k8s/frontend-deployment.yaml
 
-# Autoscaling
+# Autoscaling (KEDA + HPA)
 kubectl apply -f k8s/keda-scaledobject.yaml
+kubectl apply -f k8s/worker-hpa.yaml
 
 # Ingress
 kubectl apply -f k8s/ingress.yaml
@@ -331,9 +332,9 @@ kubectl port-forward -n video-processing svc/locust-master 8089:8089
 # due to presigned URL upload issues. Use load-generator.py instead.
 ```
 
-### 3. Autoscaling Demonstration (KEDA)
+### 3. Autoscaling Demonstration (KEDA + HPA)
 
-Watch KEDA scale workers based on RabbitMQ queue depth:
+Watch dual autoscaling in action:
 
 ```bash
 # Terminal 1: Watch worker pods
@@ -347,8 +348,10 @@ python scripts/load-generator.py --api-url http://localhost:8000 --jobs 100 --vi
 ```
 
 **Expected behavior:**
-- Queue depth increases → Workers scale up (5 messages per pod threshold)
-- Queue drains → Workers scale down after 30s cooldown
+- Queue depth increases → KEDA scales up (5 messages per pod threshold)
+- High CPU load → HPA scales up independently
+- Whichever needs more pods wins (KEDA or HPA)
+- Queue drains + CPU drops → Workers scale down after cooldown
 - Min: 1 worker, Max: 10 workers
 
 **Monitor in Grafana:**
@@ -386,6 +389,57 @@ python scripts/fault-tolerance-test.py network-latency
 # Observe increased conversion times in Grafana
 ```
 
+### 5. Smart Load Balancing Tests
+
+Verify readiness probe isolation and CPU-based scaling:
+
+**Test 1: Readiness Probe Isolation**
+```bash
+# Run the smart balancing test
+python scripts/smart-load-balancing-test.py readiness
+
+# What it does:
+# - Applies 80% CPU stress to one worker
+# - Waits for readiness probe to fail
+# - Verifies pod is marked "Not Ready"
+# - Confirms new jobs don't route to that pod
+```
+
+**Expected Result:**
+```
+✅ SUCCESS: Overloaded worker was isolated from service rotation
+   Kubernetes will not send new jobs to this pod until CPU drops
+```
+
+**Test 2: CPU-Based Autoscaling**
+```bash
+# Test HPA scaling independently of queue depth
+python scripts/smart-load-balancing-test.py cpu-scaling
+
+# What it does:
+# - Records initial pod count
+# - Stresses all workers to 80% CPU
+# - Monitors HPA scaling decisions
+# - Verifies scale-up occurred
+```
+
+**Expected Result:**
+```
+✅ SUCCESS: HPA scaled up from 1 to 3 pods
+   CPU-based autoscaling is working!
+```
+
+**Monitor Workers:**
+```bash
+# Watch pod readiness status change real-time
+kubectl get pods -n video-processing -l app=worker -w
+
+# Check individual worker health
+kubectl port-forward -n video-processing deploy/worker 8080:8080
+curl http://localhost:8080/ready
+# Response: {"ready": true, "cpu_percent": 25.4, "memory_percent": 42.1, "active_jobs": 0}
+```
+
 ---
 
 ## Monitoring & Observability
@@ -415,9 +469,9 @@ The pre-configured dashboard includes:
 
 ## Configuration
 
-### KEDA Autoscaling
+### Dual Autoscaling (KEDA + HPA)
 
-Configuration in `k8s/keda-scaledobject.yaml`:
+**KEDA Configuration** (`k8s/keda-scaledobject.yaml`):
 
 ```yaml
 minReplicaCount: 1
@@ -426,6 +480,44 @@ queueLength: 5  # messages per worker
 pollingInterval: 10s
 cooldownPeriod: 30s
 ```
+
+**HPA Configuration** (`k8s/worker-hpa.yaml`):
+
+```yaml
+metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        averageUtilization: 70  # Scale when CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        averageUtilization: 80  # Scale when Memory > 80%
+```
+
+**How they work together:**
+- KEDA scales based on queue depth (many small jobs)
+- HPA scales based on CPU/Memory (few large jobs)
+- Kubernetes uses whichever wants MORE pods
+
+### Smart Load Balancing
+
+Workers have health-aware readiness probes:
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+```
+
+**Behavior:**
+- Worker monitors its own CPU/Memory
+- When CPU > 85% or Memory > 90%: Returns "503 Not Ready"
+- Kubernetes stops routing new jobs to overloaded workers
+- Worker finishes current job, recovers, rejoins rotation
 
 ### Worker Resources
 

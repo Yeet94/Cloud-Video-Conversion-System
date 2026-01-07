@@ -1,0 +1,410 @@
+{
+    "panels": [
+        {
+            "title": "🔥 Worker CPU Usage (Per Pod)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 20
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"video-processing\", pod=~\"worker-.*\"}[1m])) by (pod) * 100",
+                    "legendFormat": "{{pod}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisLabel": "CPU %",
+                        "lineWidth": 2,
+                        "fillOpacity": 15,
+                        "gradientMode": "opacity"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 70
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    "unit": "percent"
+                }
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "showLegend": true
+                }
+            }
+        },
+        {
+            "title": "⚖️ Dual Autoscaling - HPA vs KEDA",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 20
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"video-processing\", horizontalpodautoscaler=\"worker-cpu-hpa\"}",
+                    "legendFormat": "HPA Desired (CPU/Memory)",
+                    "refId": "A"
+                },
+                {
+                    "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"video-processing\", horizontalpodautoscaler=\"worker-cpu-hpa\"}",
+                    "legendFormat": "Current Replicas",
+                    "refId": "B"
+                },
+                {
+                    "expr": "count(kube_pod_info{namespace=\"video-processing\", pod=~\"worker-.*\"})",
+                    "legendFormat": "Actual Worker Pods",
+                    "refId": "C"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisLabel": "Pod Count",
+                        "lineWidth": 2,
+                        "fillOpacity": 10,
+                        "stacking": {
+                            "mode": "none"
+                        }
+                    },
+                    "unit": "short"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "HPA Desired (CPU/Memory)"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "blue",
+                                    "mode": "fixed"
+                                }
+                            },
+                            {
+                                "id": "custom.lineWidth",
+                                "value": 3
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "title": "💚 Worker Readiness Status",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 28
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "kube_pod_status_ready{namespace=\"video-processing\", pod=~\"worker-.*\", condition=\"true\"}",
+                    "legendFormat": "{{pod}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisLabel": "Ready Status",
+                        "lineWidth": 1,
+                        "fillOpacity": 50,
+                        "drawStyle": "bars"
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "value": "1",
+                            "text": "Ready ✅"
+                        },
+                        {
+                            "type": "value",
+                            "value": "0",
+                            "text": "Not Ready ❌"
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": 0
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                }
+            }
+        },
+        {
+            "title": "🧠 Worker Memory Usage (Per Pod)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 28
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "container_memory_working_set_bytes{namespace=\"video-processing\", pod=~\"worker-.*\"} / 1024 / 1024",
+                    "legendFormat": "{{pod}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisLabel": "Memory (MB)",
+                        "lineWidth": 2,
+                        "fillOpacity": 15
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1024
+                            },
+                            {
+                                "color": "red",
+                                "value": 1638
+                            }
+                        ]
+                    },
+                    "unit": "decmbytes"
+                }
+            }
+        },
+        {
+            "title": "📊 HPA Metrics - CPU & Memory Targets",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 0,
+                "y": 34
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "kube_horizontalpodautoscaler_spec_target_metric{namespace=\"video-processing\", horizontalpodautoscaler=\"worker-cpu-hpa\", metric_name=\"cpu\"}",
+                    "legendFormat": "CPU Target: {{metric_target_value}}%",
+                    "refId": "A"
+                },
+                {
+                    "expr": "kube_horizontalpodautoscaler_spec_target_metric{namespace=\"video-processing\", horizontalpodautoscaler=\"worker-cpu-hpa\", metric_name=\"memory\"}",
+                    "legendFormat": "Memory Target: {{metric_target_value}}%",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "blue",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "percent"
+                }
+            },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "textMode": "value_and_name"
+            }
+        },
+        {
+            "title": "🎯 Average Worker CPU",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 8,
+                "y": 34
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "avg(sum(rate(container_cpu_usage_seconds_total{namespace=\"video-processing\", pod=~\"worker-.*\"}[1m])) by (pod) * 100)",
+                    "legendFormat": "Average CPU",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 50
+                            },
+                            {
+                                "color": "orange",
+                                "value": 70
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "decimals": 1
+                }
+            },
+            "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "textMode": "value_and_name"
+            }
+        },
+        {
+            "title": "✅ Ready Workers Count",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 16,
+                "y": 34
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "expr": "sum(kube_pod_status_ready{namespace=\"video-processing\", pod=~\"worker-.*\", condition=\"true\"})",
+                    "legendFormat": "Ready Workers",
+                    "refId": "A"
+                },
+                {
+                    "expr": "count(kube_pod_info{namespace=\"video-processing\", pod=~\"worker-.*\"})",
+                    "legendFormat": "Total Workers",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "green",
+                                "value": 2
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                }
+            },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "textMode": "value_and_name"
+            }
+        }
+    ]
+}

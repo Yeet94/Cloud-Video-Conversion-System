@@ -27,6 +27,8 @@ spec:
         ports:
         - containerPort: 8001
           name: metrics
+        - containerPort: 8080
+          name: health
         env:
         - name: APP_RABBITMQ_HOST
           valueFrom:
@@ -98,6 +100,25 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "2000m"
+        # Liveness probe - restart if worker is completely unresponsive
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60  # Increased from 30 - give server time to start
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # Readiness probe - stop sending work if CPU/memory too high
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 15  # Increased from 10
+          periodSeconds: 10  # Increased from 5 - less aggressive checking
+          timeoutSeconds: 5  # Increased from 3
+          successThreshold: 1
+          failureThreshold: 3  # Increased from 2 - more tolerant
         securityContext:
           capabilities:
             add:

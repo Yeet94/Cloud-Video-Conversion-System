@@ -1,0 +1,49 @@
+---
+# CPU-based HorizontalPodAutoscaler
+# This works ALONGSIDE KEDA to provide dual-trigger autoscaling:
+# - KEDA scales based on RabbitMQ queue depth
+# - HPA scales based on CPU usage
+# The higher of the two will take effect
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: worker-cpu-hpa
+  namespace: video-processing
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Scale up when average CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Scale up when average memory > 80%
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30  # Wait 30s before scaling up
+      policies:
+      - type: Percent
+        value: 50  # Scale up by 50% (e.g., 2 -> 3 pods)
+        periodSeconds: 30
+      - type: Pods
+        value: 2  # Or add max 2 pods at a time
+        periodSeconds: 30
+      selectPolicy: Max  # Use the most aggressive policy
+    scaleDown:
+      stabilizationWindowSeconds: 60  # Wait 60s before scaling down
+      policies:
+      - type: Percent
+        value: 25  # Scale down by 25% at a time
+        periodSeconds: 60
+      selectPolicy: Min  # Use the most conservative policy

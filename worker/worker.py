@@ -8,8 +8,10 @@ import logging
 import subprocess
 import tempfile
 import threading
+import psutil
 from typing import Optional
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import pika
 from minio import Minio
@@ -77,6 +79,77 @@ UPLOAD_TIME = Histogram(
 # Global state
 shutdown_event = threading.Event()
 current_ffmpeg_process: Optional[subprocess.Popen] = None
+
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """HTTP handler for health and readiness checks."""
+    
+    def do_GET(self):
+        """Handle GET requests for health/readiness."""
+        if self.path == '/health':
+            # Liveness probe - always return 200 if worker is running
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'status': 'alive'}).encode())
+            
+        elif self.path == '/ready':
+            # Readiness probe - check CPU and memory usage
+            try:
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                memory_percent = psutil.virtual_memory().percent
+                
+                # Worker is ready if:
+                # - CPU usage < 85%
+                # - Memory usage < 90%
+                # - Not shutting down
+                is_ready = (
+                    cpu_percent < 85 and 
+                    memory_percent < 90 and 
+                    not shutdown_event.is_set()
+                )
+                
+                status_code = 200 if is_ready else 503
+                self.send_response(status_code)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                
+                response = {
+                    'ready': is_ready,
+                    'cpu_percent': round(cpu_percent, 2),
+                    'memory_percent': round(memory_percent, 2),
+                    'active_jobs': ACTIVE_JOBS._value._value  # Access gauge value
+                }
+                self.wfile.write(json.dumps(response).encode())
+                
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        """Suppress default logging."""
+        pass
+
+
+def start_health_server(port=8080):
+    """Start health check server in background thread."""
+    try:
+        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        logger.info(f"Health check server started on port {port}")
+        # Give the server a moment to start
+        time.sleep(0.5)
+        return server
+    except Exception as e:
+        logger.error(f"Failed to start health check server on port {port}: {e}")
+        # Return None but don't crash - worker can still function
+        return None
 
 
 def get_minio_client() -> Minio:
@@ -411,6 +484,14 @@ def main():
     # Start Prometheus metrics server
     start_http_server(settings.metrics_port)
     logger.info(f"Prometheus metrics server started on port {settings.metrics_port}")
+    
+    # Start health check server for readiness/liveness probes
+    logger.info("Starting health check server on port 8080...")
+    health_server = start_health_server(port=8080)
+    if health_server:
+        logger.info("✓ Health check server started successfully")
+    else:
+        logger.warning("⚠ Health check server failed to start - probes will fail!")
     
     # Register signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
