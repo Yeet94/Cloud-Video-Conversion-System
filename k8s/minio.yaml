@@ -103,8 +103,36 @@ spec:
         - /bin/sh
         - -c
         - |
-          sleep 10
-          mc alias set myminio http://minio:9000 minioadmin minioadmin
-          mc mb myminio/videos --ignore-existing
+          # Wait for MinIO to be ready (up to 60 seconds)
+          echo "Waiting for MinIO to be ready..."
+          for i in $(seq 1 12); do
+            if mc alias set myminio http://minio:9000 minioadmin minioadmin 2>/dev/null; then
+              echo "MinIO is ready!"
+              break
+            fi
+            echo "MinIO not ready yet, retrying in 5 seconds... ($i/12)"
+            sleep 5
+          done
+          
+          # Verify connection worked
+          if ! mc alias list myminio &>/dev/null; then
+            echo "ERROR: Failed to connect to MinIO after 60 seconds"
+            exit 1
+          fi
+          
+          # Create bucket
+          echo "Creating bucket 'videos'..."
+          if mc mb myminio/videos 2>/dev/null; then
+            echo "Bucket 'videos' created successfully"
+          elif mc ls myminio/videos &>/dev/null; then
+            echo "Bucket 'videos' already exists"
+          else
+            echo "ERROR: Failed to create or verify bucket"
+            exit 1
+          fi
+          
+          # Set download policy
+          echo "Setting bucket policy..."
           mc anonymous set download myminio/videos
-          echo "MinIO bucket initialized"
+          
+          echo "MinIO bucket initialized successfully!"

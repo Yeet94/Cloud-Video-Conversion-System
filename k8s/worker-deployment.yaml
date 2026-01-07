@@ -93,11 +93,11 @@ spec:
           mountPath: /data
         resources:
           requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
             memory: "512Mi"
             cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
         securityContext:
           capabilities:
             add:

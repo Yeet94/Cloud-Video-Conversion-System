@@ -19,8 +19,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: video.local
-    http:
+  - http:
       paths:
       # API (specific paths MUST come before frontend catch-all)
       - path: /api(/|$)(.*) 
@@ -83,8 +82,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: video.local
-    http:
+  - http:
       paths:
       # Grafana
       - path: /grafana(/|$)(.*) 

@@ -445,7 +445,7 @@ def main():
                 arguments={'x-message-ttl': 86400000}
             )
             
-            # Set prefetch to 1 for fair dispatch
+            # Set prefetch to 1 for fair dispatch [Important to tell RabbitMQ not to give more than one message to a worker]
             channel.basic_qos(prefetch_count=1)
             
             logger.info(f"Connected to RabbitMQ, consuming from queue: {settings.rabbitmq_queue}")

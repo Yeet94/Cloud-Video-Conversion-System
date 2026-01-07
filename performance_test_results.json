@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-12-31T00:40:28.658234",
+  "tests": [
+    {
+      "test": "Baseline: 10MB videos (20 jobs)",
+      "duration": 1.67,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nLoad Test: 20 jobs with 10MB videos\n============================================================\nSubmitting job 1/20... ",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 126, in <module>\n    run_load_test(args.api_url, args.video_size, args.jobs)\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 93, in run_load_test\n    print(f\"\\u2713 Job {result['job_id']}\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode character '\\u2713' in position 0: character maps to <undefined>\n"
+    },
+    {
+      "test": "Baseline: 50MB videos (20 jobs)",
+      "duration": 1.87,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nLoad Test: 20 jobs with 50MB videos\n============================================================\nSubmitting job 1/20... ",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 126, in <module>\n    run_load_test(args.api_url, args.video_size, args.jobs)\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 93, in run_load_test\n    print(f\"\\u2713 Job {result['job_id']}\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode character '\\u2713' in position 0: character maps to <undefined>\n"
+    },
+    {
+      "test": "Baseline: 100MB videos (10 jobs)",
+      "duration": 1.74,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nLoad Test: 10 jobs with 100MB videos\n============================================================\nSubmitting job 1/10... ",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 126, in <module>\n    run_load_test(args.api_url, args.video_size, args.jobs)\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\simple-load-test.py\", line 93, in run_load_test\n    print(f\"\\u2713 Job {result['job_id']}\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode character '\\u2713' in position 0: character maps to <undefined>\n"
+    },
+    {
+      "test": "Scalability: 100 jobs burst test",
+      "duration": 30.5,
+      "exit_code": 0,
+      "stdout": "\n============================================================\nStarting Load Test\n============================================================\nAPI URL: http://localhost/api\nJobs: 100\nConcurrent: 20\nVideo Size: 50MB\n============================================================\n\n\n============================================================\nLoad Test Summary\n============================================================\nTotal Jobs: 100\nSuccessful: 100\nFailed: 0\nAverage Submission Time: 3.53s\n\nCheck Grafana dashboard for detailed metrics!\nkubectl port-forward svc/prometheus-grafana 3000:80 -n monitoring\n\nTotal Time: 29.46s\nThroughput: 3.39 jobs/sec\n",
+      "stderr": ""
+    },
+    {
+      "test": "Fault Tolerance: Pod Termination",
+      "duration": 0.26,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nCloud Video Conversion - Fault Tolerance Testing\n============================================================\n",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 196, in <module>\n    main()\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 166, in main\n    print(\"\\n\\u26a0\\ufe0f  WARNING: These tests will inject faults into your cluster!\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode characters in position 2-3: character maps to <undefined>\n"
+    },
+    {
+      "test": "Fault Tolerance: Network Latency",
+      "duration": 0.3,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nCloud Video Conversion - Fault Tolerance Testing\n============================================================\n",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 196, in <module>\n    main()\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 166, in main\n    print(\"\\n\\u26a0\\ufe0f  WARNING: These tests will inject faults into your cluster!\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode characters in position 2-3: character maps to <undefined>\n"
+    },
+    {
+      "test": "Fault Tolerance: CPU Pressure",
+      "duration": 0.3,
+      "exit_code": 1,
+      "stdout": "\n============================================================\nCloud Video Conversion - Fault Tolerance Testing\n============================================================\n",
+      "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 196, in <module>\n    main()\n  File \"C:\\Users\\Hcche\\Downloads\\Cloud Video Conversion System\\scripts\\fault-tolerance-test.py\", line 166, in main\n    print(\"\\n\\u26a0\\ufe0f  WARNING: These tests will inject faults into your cluster!\")\n  File \"C:\\Users\\Hcche\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\encodings\\cp1252.py\", line 19, in encode\n    return codecs.charmap_encode(input,self.errors,encoding_table)[0]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nUnicodeEncodeError: 'charmap' codec can't encode characters in position 2-3: character maps to <undefined>\n"
+    }
+  ]
+}

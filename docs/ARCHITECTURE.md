@@ -67,9 +67,43 @@ The Cloud Video Conversion System is a distributed, event-driven application des
 *   **Role**: Automatically scales the number of Worker pods based on the RabbitMQ queue length.
 *   **Trigger**: If queue length > 10, add more pods (configurable).
 
+#### **8. Load Generator (Locust)**
+*   **Role**: Simulates traffic for load testing.
+*   **Deployment**: Runs as a Pod within the Kubernetes cluster to avoid network latency.
+*   **Behavior**:
+    *   Implements a **Closed-System Model**: Each virtual user waits for a job to complete before starting a new one.
+    *   Simulates realistic user lifecycle: Upload -> Queue -> Poll -> Download.
+*   **Traffic Pattern**: Can simulate concurrent users (e.g., 50) to test autoscaling triggers.
+
 ---
 
 ## 3. Data Flow: Life of a Video Job
+
+```mermaid
+graph TD
+    subgraph "Cluster: video-processing"
+        Locust[Locust Load Gen]
+        User[End User / Frontend]
+        API[API Service]
+        MinIO[(MinIO Storage)]
+        RabbitMQ[(RabbitMQ)]
+        Worker[Worker Pod]
+        KEDA[KEDA Autoscaler]
+        
+        Locust -.->|Load Test| API
+        User -->|1. Request Upload| API
+        API -->|2. Presigned URL| User
+        User -->|3. Direct Upload| MinIO
+        User -->|4. Create Job| API
+        API -->|5. Publish Job| RabbitMQ
+        
+        KEDA -.-> |Monitor| RabbitMQ
+        KEDA -.-> |Scale| Worker
+        
+        Worker -->|6. Consume| RabbitMQ
+        Worker -->|7. Process| MinIO
+    end
+```
 
 The timeline of a single conversion request follows these steps:
 

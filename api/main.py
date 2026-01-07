@@ -113,10 +113,33 @@ def get_minio_client(endpoint: Optional[str] = None) -> Minio:
 
 
 def get_rabbitmq_channel():
-    """Get or create RabbitMQ channel."""
+    """Get or create RabbitMQ channel with automatic reconnection."""
     global rabbitmq_connection, rabbitmq_channel
     
-    if rabbitmq_connection is None or rabbitmq_connection.is_closed:
+    # Check if connection exists and is still alive
+    if rabbitmq_connection is not None and not rabbitmq_connection.is_closed:
+        try:
+            # Test if channel is still usable by doing a passive queue check
+            # This will raise an exception if the connection is stale
+            if rabbitmq_channel and rabbitmq_channel.is_open:
+                rabbitmq_channel.queue_declare(
+                    queue=settings.rabbitmq_queue,
+                    passive=True  # Don't create, just check
+                )
+                # Connection is good!
+                return rabbitmq_channel
+            else:
+                # Channel is closed, need new one
+                logger.warning("RabbitMQ channel is closed, creating new channel")
+                rabbitmq_channel = None
+        except Exception as e:
+            # Connection is stale/broken, force reconnect
+            logger.warning(f"RabbitMQ connection test failed: {e}, reconnecting...")
+            rabbitmq_connection = None
+            rabbitmq_channel = None
+    
+    # Create new connection
+    try:
         credentials = pika.PlainCredentials(
             settings.rabbitmq_user,
             settings.rabbitmq_password
@@ -141,8 +164,13 @@ def get_rabbitmq_channel():
             }
         )
         logger.info(f"Connected to RabbitMQ, queue: {settings.rabbitmq_queue}")
-    
-    return rabbitmq_channel
+        return rabbitmq_channel
+        
+    except Exception as e:
+        logger.error(f"Failed to connect to RabbitMQ: {e}")
+        rabbitmq_connection = None
+        rabbitmq_channel = None
+        raise
 
 
 def update_job_metrics():

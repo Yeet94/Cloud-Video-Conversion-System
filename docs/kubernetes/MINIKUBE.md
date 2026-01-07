@@ -175,7 +175,9 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 
 # Install Prometheus Stack
-helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --set grafana.adminPassword=admin \
+  -n monitoring
 
 # Wait for all monitoring pods
 kubectl get pods -n monitoring --watch
@@ -209,6 +211,9 @@ kubectl apply -f k8s/ingress.yaml
 # Monitoring (ServiceMonitors)
 kubectl apply -f k8s/monitoring/
 
+# Load Testing (optional but recommended for demos)
+kubectl apply -f k8s/locust-deployment.yaml
+
 # Verify all pods are running
 kubectl get pods -n video-processing
 kubectl get pods -n monitoring
@@ -230,6 +235,8 @@ minikube tunnel
 ```
 
 This command requires admin privileges. Leave it running while using the application.
+
+**Note:** The tunnel is required for `http://localhost` access via Ingress. Admin tools (below) use port-forward and don't need the tunnel.
 
 ### Main Application
 
@@ -265,12 +272,6 @@ kubectl port-forward -n video-processing svc/rabbitmq 15672:15672
 - URL: **http://localhost:15672**
 - Login: `guest` / `guest`
 
-**Locust (Load Testing UI):**
-```bash
-kubectl port-forward -n video-processing svc/locust-master 8089:8089
-```
-- URL: **http://localhost:8089**
-
 ### Import Grafana Dashboard
 
 1. Navigate to **http://localhost:3000**
@@ -296,21 +297,41 @@ Test video upload and conversion:
 # Monitor progress in Grafana dashboard
 ```
 
-### 2. Performance Baseline Test
+### 2. Load Testing (Recommended)
 
-Test conversion performance with different video sizes:
+**Use the Python load generator for reliable end-to-end testing:**
 
 ```bash
-# Ensure API is accessible
-kubectl port-forward svc/api 8000:8000 -n video-processing
+# Light test (20 jobs, 10MB videos)
+python scripts/load-generator.py --api-url http://localhost/api --jobs 20 --video-size 10 --monitor
 
-# Run load tests (in a new terminal)
-python scripts/load-generator.py --api-url http://localhost:8000 --jobs 50 --video-size 10
-python scripts/load-generator.py --api-url http://localhost:8000 --jobs 30 --video-size 50
-python scripts/load-generator.py --api-url http://localhost:8000 --jobs 20 --video-size 100
+# Medium test (50 jobs, 25MB videos)
+python scripts/load-generator.py --api-url http://localhost/api --jobs 50 --video-size 25 --monitor
+
+# Heavy test (100 jobs, 10MB videos, 10 concurrent)
+python scripts/load-generator.py --api-url http://localhost/api --jobs 100 --video-size 10 --concurrent 10 --monitor
 ```
 
-### 3. Autoscaling Demonstration (HPA/KEDA)
+**Why load-generator.py instead of Locust?**
+- ✅ Properly uploads real videos to MinIO via presigned URLs
+- ✅ Tracks job completion and success rates
+- ✅ Shows live KEDA scaling status
+- ✅ Easier to use for demos
+
+**Optional - Locust Web UI:**
+
+Locust is available but has limitations with MinIO presigned URL uploads:
+
+```bash
+# Access Locust UI
+kubectl port-forward -n video-processing svc/locust-master 8089:8089
+# Visit http://localhost:8089
+
+# Note: Jobs may fail with "Failed to download input file"
+# due to presigned URL upload issues. Use load-generator.py instead.
+```
+
+### 3. Autoscaling Demonstration (KEDA)
 
 Watch KEDA scale workers based on RabbitMQ queue depth:
 
@@ -455,6 +476,72 @@ kubectl describe scaledobject worker-scaledobject -n video-processing
 
 # View events
 kubectl get events -n video-processing --sort-by='.lastTimestamp'
+```
+
+### Common Issues
+
+**Problem: "Failed to create job" / 500 errors when uploading**
+
+**Cause:** RabbitMQ connection has become stale after running for several hours.
+
+**Solution:**
+```bash
+# Restart API pods to refresh RabbitMQ connections
+kubectl rollout restart deployment/api -n video-processing
+kubectl wait --for=condition=ready pod -l app=api -n video-processing
+```
+
+**Note:** The API code now includes automatic reconnection logic, but a manual restart ensures fresh connections before demos.
+
+---
+
+**Problem: Grafana dashboard shows "No data" for metrics**
+
+**Cause:** Prometheus ServiceMonitor not scraping metrics (usually fixed in current version).
+
+**Solution:**
+```bash
+# Check if Prometheus is scraping the API
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+
+# Visit http://localhost:9090 and query: rabbitmq_queue_depth
+# If empty, check ServiceMonitor configuration
+kubectl get servicemon itors -n monitoring
+```
+
+---
+
+**Problem: Pods stuck in "ContainerCreating"**
+
+**Cause:** Docker image not built or missing in Minikube's Docker daemon.
+
+**Solution:**
+```bash
+# Switch to Minikube's Docker
+& minikube -p minikube docker-env --shell powershell | Invoke-Expression
+
+# Rebuild missing image
+docker build -t video-api:latest -f api/Dockerfile .
+docker build -t video-worker:latest -f worker/Dockerfile .
+docker build -t video-frontend:latest -f frontend/Dockerfile .
+
+# Restart deployment
+kubectl rollout restart deployment/<deployment-name> -n video-processing
+```
+
+---
+
+**Problem: "Bucket does not exist" errors**
+
+**Cause:** MinIO init job failed or completed before MinIO was ready.
+
+**Solution:**
+```bash
+# Check if bucket exists (requires port-forward to MinIO)
+kubectl port-forward -n video-processing svc/minio 9000:9000
+
+# Create bucket manually via Python
+python -c "from minio import Minio; client = Minio('localhost:9000', access_key='minioadmin', secret_key='minioadmin', secure=False); client.make_bucket('videos'); print('Bucket created!')"
 ```
 
 ---

@@ -8,12 +8,9 @@ RUN pip install --no-cache-dir locust
 # Copy the locustfile
 COPY tests/load/locustfile.py /locust/locustfile.py
 
-# Create directory and dummy sample.mp4 for testing
-# Download a valid sample video (~2MB)
-RUN apt-get update && apt-get install -y curl && \
-    mkdir -p /mnt/locust && \
-    curl -L -o /mnt/locust/sample.mp4 https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4 && \
-    rm -rf /var/lib/apt/lists/*
+# Copy local test video
+RUN mkdir -p /mnt/locust
+COPY test_video.mp4 /mnt/locust/sample.mp4
 
 EXPOSE 8089 5557
 
