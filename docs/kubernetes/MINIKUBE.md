@@ -725,6 +725,214 @@ docker rmi video-api:latest video-worker:latest video-frontend:latest
 
 ---
 
+## Load Testing
+
+The system provides three methods for load testing to demonstrate autoscaling and performance:
+
+### Method 1: Frontend Load Test (Recommended for Demos)
+
+**Easiest and most visual option** - perfect for demonstrations.
+
+1. **Access the frontend:**
+   ```
+   http://localhost
+   ```
+
+2. **Navigate to Load Testing section** (scroll down)
+
+3. **Configure test:**
+   - **Number of Jobs:** 20 (start with moderate load)
+   - **Video Size:** 5 MB (Medium)
+   - **Concurrent Uploads:** 5
+
+4. **Click "Start Load Test"**
+
+5. **Watch real-time progress:**
+   - Progress bar shows completion
+   - Statistics show successful/failed jobs
+   - Jobs appear in the job list below
+
+**What happens:**
+- Frontend calls `/load-test/generate` to create synthetic videos
+- API uploads videos to MinIO automatically
+- Jobs are created and queued in RabbitMQ
+- Workers scale up to process the load
+- Results shown in real-time
+
+---
+
+### Method 2: Locust (External Mode)
+
+**Most professional option** - provides detailed metrics and reports.
+
+#### Prerequisites:
+```powershell
+pip install locust
+```
+
+#### Quick Start:
+
+**Option A: Web UI (Interactive)**
+```powershell
+# Navigate to tests directory
+cd tests/load
+
+# Start Locust web UI
+locust -f locustfile-external.py --host=http://localhost/api
+
+# Open browser: http://localhost:8089
+# Configure: 10 users, 2 users/sec spawn rate
+# Click "Start swarming"
+```
+
+**Option B: Headless (Automated)**
+```powershell
+# Run 30-second test with 10 users
+locust -f locustfile-external.py --host=http://localhost/api \
+  --users 10 --spawn-rate 2 --run-time 30s --headless --html report.html
+```
+
+#### What Gets Tested:
+- ✅ Video generation (`/load-test/generate`)
+- ✅ Job creation (`/jobs`)
+- ✅ Status polling (`/jobs/{id}`)
+- ✅ Download URL generation (`/download/{id}`)
+- ✅ Health checks (`/health`)
+
+#### Monitoring During Test:
+```powershell
+# Watch pods scaling
+kubectl get pods -n video-processing -w
+
+# Watch queue depth
+kubectl exec -n video-processing rabbitmq-0 -- rabbitmqctl list_queues
+
+# View Grafana dashboard
+# http://localhost/grafana
+```
+
+**See [tests/load/EXTERNAL_LOCUST_GUIDE.md](../../tests/load/EXTERNAL_LOCUST_GUIDE.md) for detailed guide.**
+
+---
+
+### Method 3: Python Load Generator
+
+**Simple command-line option** - good for quick tests.
+
+```powershell
+# Navigate to tests directory
+cd tests/load
+
+# Run load generator
+python load-generator.py --jobs 20 --concurrent 5 --video-size 5
+```
+
+**Options:**
+- `--jobs`: Number of jobs to create (default: 10)
+- `--concurrent`: Concurrent uploads (default: 3)
+- `--video-size`: Video size in MB (default: 5)
+- `--api-url`: API endpoint (default: http://localhost/api)
+
+---
+
+### Observing Autoscaling
+
+While running any load test, observe the autoscaling behavior:
+
+#### 1. Watch KEDA Scaling:
+```powershell
+# Watch ScaledObject status
+kubectl get scaledobject -n video-processing -w
+
+# Expected output:
+# NAME     SCALETARGETKIND      SCALETARGETNAME   MIN   MAX   TRIGGERS     READY
+# worker   apps/v1.Deployment   worker            1     10    rabbitmq     True
+```
+
+#### 2. Watch Worker Pods:
+```powershell
+# Watch pods in real-time
+kubectl get pods -n video-processing -l app=worker -w
+
+# You'll see workers scale: 1 → 3 → 5 → 10 (depending on load)
+```
+
+#### 3. Watch Queue Depth:
+```powershell
+# Check RabbitMQ queue
+kubectl exec -n video-processing rabbitmq-0 -- rabbitmqctl list_queues name messages
+
+# Expected progression:
+# video-jobs  0      (idle)
+# video-jobs  25     (load test starts)
+# video-jobs  15     (workers scaling up)
+# video-jobs  5      (workers processing)
+# video-jobs  0      (load complete, workers scale down)
+```
+
+#### 4. View Grafana Dashboard:
+```
+http://localhost/grafana
+```
+
+Navigate to **"Video Processing - Comprehensive Dashboard"** to see:
+- 📊 Throughput (videos/min)
+- ⚖️ Queue depth vs worker pods
+- 🔥 Worker CPU usage
+- ⏱️ Conversion performance (P50/P95/P99)
+- 📈 Real-time metrics
+
+---
+
+### Expected Scaling Behavior
+
+| Queue Depth | Workers | Behavior |
+|-------------|---------|----------|
+| 0-4 messages | 1 pod | Minimum replicas (idle state) |
+| 5-9 messages | 2 pods | KEDA scales up (5 msg/pod threshold) |
+| 10-24 messages | 3-5 pods | Gradual scaling |
+| 25-49 messages | 6-10 pods | Maximum scaling |
+| 50+ messages | 10 pods | Max replicas reached |
+
+**Scale-down:** Workers scale down after queue is empty (cooldown period: 300s)
+
+---
+
+### Troubleshooting Load Tests
+
+#### Issue: "Connection refused"
+```
+Error: Failed to connect to http://localhost/api
+```
+**Solution:** Ensure `minikube tunnel` is running
+
+#### Issue: Jobs failing with "database is locked"
+```
+Error: SQLITE_BUSY
+```
+**Solution:** This is expected with high concurrency due to SQLite limitations. Keep API at 1 replica. For production, use PostgreSQL.
+
+#### Issue: Workers not scaling
+```
+Workers stuck at 1 replica despite high queue depth
+```
+**Solution:** Check KEDA status:
+```powershell
+kubectl get scaledobject -n video-processing
+kubectl describe scaledobject worker -n video-processing
+```
+
+#### Issue: Slow video processing
+```
+Jobs stuck in "processing" state
+```
+**Solution:** Check worker logs:
+```powershell
+kubectl logs -n video-processing -l app=worker --tail=50
+```
+
+---
+
 ## Next Steps
 
 - **Architecture Deep Dive**: See [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
