@@ -57,6 +57,12 @@ function initializeEventListeners() {
             }, 1000);
         });
     });
+
+    // Load testing button
+    const loadTestBtn = document.getElementById('loadTestBtn');
+    if (loadTestBtn) {
+        loadTestBtn.addEventListener('click', handleLoadTest);
+    }
 }
 
 // ============================================
@@ -395,6 +401,123 @@ function resetUploadZone() {
 
     const fileInfo = uploadZone.querySelector('.file-info');
     if (fileInfo) fileInfo.remove();
+}
+
+// ============================================
+// Load Testing
+// ============================================
+
+async function handleLoadTest() {
+    const jobCount = parseInt(document.getElementById('jobCount').value);
+    const videoSize = parseInt(document.getElementById('videoSize').value);
+    const concurrent = parseInt(document.getElementById('concurrent').value);
+
+    const loadTestBtn = document.getElementById('loadTestBtn');
+    const loadTestStatus = document.getElementById('loadTestStatus');
+    const loadTestProgress = document.getElementById('loadTestProgress');
+    const loadTestText = document.getElementById('loadTestText');
+    const loadTestStats = document.getElementById('loadTestStats');
+
+    // Disable button and show status
+    loadTestBtn.disabled = true;
+    loadTestStatus.style.display = 'block';
+
+    let completed = 0;
+    let failed = 0;
+    const startTime = Date.now();
+
+    try {
+        loadTestText.textContent = `Generating ${jobCount} test jobs...`;
+        loadTestProgress.style.width = '0%';
+
+        // Create jobs in batches
+        const batches = [];
+        for (let i = 0; i < jobCount; i += concurrent) {
+            const batchSize = Math.min(concurrent, jobCount - i);
+            batches.push(batchSize);
+        }
+
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batchSize = batches[batchIndex];
+            const batchPromises = [];
+
+            for (let i = 0; i < batchSize; i++) {
+                batchPromises.push(
+                    createLoadTestJob(videoSize)
+                        .then(() => {
+                            completed++;
+                            updateLoadTestProgress();
+                        })
+                        .catch((error) => {
+                            failed++;
+                            console.error('Job creation failed:', error);
+                            updateLoadTestProgress();
+                        })
+                );
+            }
+
+            await Promise.all(batchPromises);
+        }
+
+        function updateLoadTestProgress() {
+            const total = completed + failed;
+            const percent = Math.round((total / jobCount) * 100);
+            loadTestProgress.style.width = `${percent}%`;
+
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            loadTestText.textContent = `Progress: ${total}/${jobCount} jobs created`;
+            loadTestStats.textContent = `✓ ${completed} successful • ✗ ${failed} failed • ${elapsed}s elapsed`;
+        }
+
+        // Final update
+        const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+        loadTestText.textContent = `✅ Load test complete!`;
+        loadTestStats.textContent = `Created ${completed} jobs in ${totalTime}s (${failed} failed)`;
+
+        // Refresh job list
+        setTimeout(() => {
+            loadJobs();
+        }, 1000);
+
+    } catch (error) {
+        console.error('Load test failed:', error);
+        loadTestText.textContent = `❌ Load test failed: ${error.message}`;
+    } finally {
+        // Re-enable button after 3 seconds
+        setTimeout(() => {
+            loadTestBtn.disabled = false;
+            loadTestStatus.style.display = 'none';
+        }, 3000);
+    }
+}
+
+async function createLoadTestJob(sizeMb) {
+    // Step 1: Generate synthetic video
+    const generateResponse = await fetch(`${API_BASE}/load-test/generate?size_mb=${sizeMb}`, {
+        method: 'POST'
+    });
+
+    if (!generateResponse.ok) {
+        throw new Error('Failed to generate test video');
+    }
+
+    const { object_path } = await generateResponse.json();
+
+    // Step 2: Create conversion job
+    const jobResponse = await fetch(`${API_BASE}/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            input_path: object_path,
+            output_format: 'mp4'
+        })
+    });
+
+    if (!jobResponse.ok) {
+        throw new Error('Failed to create job');
+    }
+
+    return jobResponse.json();
 }
 
 // Add CSS animation for refresh spinner

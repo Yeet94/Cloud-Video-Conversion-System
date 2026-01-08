@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r /app/api/requirements.txt
 # Copy API application
 COPY api/ /app/api/
 
+# Copy test videos for load testing
+COPY test_video_*.mp4 /app/
+
 # Create data directory for database
 RUN mkdir -p /data
 

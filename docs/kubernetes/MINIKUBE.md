@@ -538,9 +538,29 @@ resources:
 - **Type**: SQLite (development only)
 - **Storage**: PersistentVolumeClaim (ReadWriteMany)
 - **Path**: `/data/jobs.db`
-- **Shared by**: API pods (2 replicas) + Worker pods (1-10 replicas)
+- **Shared by**: API pods + Worker pods
 
-> **Production Note**: Replace SQLite with PostgreSQL/MySQL for true multi-writer support.
+> **⚠️ IMPORTANT - SQLite Limitation:**  
+> SQLite does **NOT support multiple concurrent writers**. If you scale API to 2+ pods or have multiple workers, you'll get database lock errors.
+> 
+> **For this demo:**
+> - Keep API at `replicas: 1` (current default)
+> - Workers can scale (they mostly read), but expect occasional write conflicts
+> 
+> **For production:** Replace with PostgreSQL/MySQL for true multi-writer support.
+
+**Viewing the Database:**
+
+```bash
+# Check PVC status
+kubectl get pvc database-pvc -n video-processing
+
+# Query jobs directly from the pod
+kubectl exec -n video-processing deployment/api -- python -c "import sqlite3, json; conn = sqlite3.connect('/data/jobs.db'); conn.row_factory = sqlite3.Row; cursor = conn.cursor(); cursor.execute('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 10'); rows = cursor.fetchall(); print(json.dumps([dict(row) for row in rows], indent=2)); conn.close()"
+
+# Copy database to local machine for inspection
+kubectl cp video-processing/$(kubectl get pod -n video-processing -l app=api -o jsonpath='{.items[0].metadata.name}'):/data/jobs.db ./data/jobs.db
+```
 
 ---
 

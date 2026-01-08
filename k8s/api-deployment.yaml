@@ -22,7 +22,7 @@ metadata:
   name: api
   namespace: video-processing
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api

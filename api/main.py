@@ -1,6 +1,7 @@
 # FastAPI Video Processing API Service
 import sys
 import os
+import io
 import uuid
 import json
 import logging
@@ -479,6 +480,75 @@ async def get_download_url(job_id: str):
         logger.error(f"MinIO error generating download URL: {e}")
         REQUEST_COUNT.labels(method='GET', endpoint='/download/{job_id}', status_code=500).inc()
         raise HTTPException(status_code=500, detail=f"Storage error: {str(e)}")
+
+
+@app.post("/load-test/generate")
+async def generate_load_test_video(size_mb: int = 5):
+    """Generate a test video file for load testing using pre-generated test videos."""
+    import time
+    start_time = time.time()
+    
+    try:
+        # Map size to test video file
+        test_video_map = {
+            1: "test_video_1mb.mp4",
+            5: "test_video_5mb.mp4",
+            10: "test_video_10mb.mp4",
+            20: "test_video_25mb.mp4",
+            25: "test_video_25mb.mp4",
+            50: "test_video_50mb.mp4",
+            100: "test_video_100mb.mp4"
+        }
+        
+        # Find closest matching test video
+        available_sizes = sorted(test_video_map.keys())
+        closest_size = min(available_sizes, key=lambda x: abs(x - size_mb))
+        test_video_filename = test_video_map[closest_size]
+        test_video_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), test_video_filename)
+        
+        # Check if test video exists
+        if not os.path.exists(test_video_path):
+            # Fallback to generating synthetic data
+            logger.warning(f"Test video {test_video_filename} not found, generating synthetic data")
+            video_data = os.urandom(size_mb * 1024 * 1024)
+            video_stream = io.BytesIO(video_data)
+            file_size = len(video_data)
+        else:
+            # Read actual test video
+            with open(test_video_path, 'rb') as f:
+                video_data = f.read()
+            video_stream = io.BytesIO(video_data)
+            file_size = len(video_data)
+            logger.info(f"Using test video: {test_video_filename} ({file_size / 1024 / 1024:.2f} MB)")
+        
+        # Upload to MinIO
+        client = get_minio_client()
+        job_id = str(uuid.uuid4())
+        object_path = f"uploads/{job_id}.mp4"
+        
+        client.put_object(
+            settings.minio_bucket,
+            object_path,
+            video_stream,
+            length=file_size,
+            content_type='video/mp4'
+        )
+        
+        REQUEST_COUNT.labels(method='POST', endpoint='/load-test/generate', status_code=200).inc()
+        REQUEST_DURATION.labels(method='POST', endpoint='/load-test/generate').observe(time.time() - start_time)
+        
+        return {
+            "object_path": object_path,
+            "size_mb": round(file_size / 1024 / 1024, 2),
+            "job_id": job_id,
+            "source": test_video_filename if os.path.exists(test_video_path) else "synthetic"
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to generate test video: {e}")
+        REQUEST_COUNT.labels(method='POST', endpoint='/load-test/generate', status_code=500).inc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate test video: {str(e)}")
+
 
 
 if __name__ == "__main__":
