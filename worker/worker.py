@@ -441,9 +441,9 @@ def on_message(channel, method, properties, body):
             # Acknowledge successful processing
             channel.basic_ack(delivery_tag=method.delivery_tag)
         else:
-            # NACK with requeue for retry (up to a point)
-            # In a real system, you'd track retry count
-            channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            # NACK with requeue for retry
+            # Message will be requeued and picked up by another worker
+            channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
             FAILURE_RATE.labels(failure_type='nack').inc()
             
     except json.JSONDecodeError as e:
